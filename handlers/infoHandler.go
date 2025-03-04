@@ -1,21 +1,19 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
+	"sort"
+	"strconv"
 )
 
-/*
-Entry point handler for Location information
-*/
 func InfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		handlePostRequest(w, r)
-	case http.MethodGet:
-		handleGetRequest(w, r)
+		handleGetInfoRequest(w, r)
 	default:
 		http.Error(w, "REST Method '"+r.Method+"' not supported. Currently only '"+http.MethodGet+
 			"' and '"+http.MethodPost+"' are supported.", http.StatusNotImplemented)
@@ -24,104 +22,134 @@ func InfoHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func handlePostRequest(w http.ResponseWriter, r *http.Request) {
+func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 
-	// TODO: Check for content type
+	isoCode := r.URL.Query().Get("two_letter_country_code")
 
-	// Instantiate decoder
-	decoder := json.NewDecoder(r.Body)
-	// Ensure parser fails on unknown fields (baseline way of detecting different structs than expected ones)
-	// Note: This does not lead to a check whether an actually provided field is empty!
-	decoder.DisallowUnknownFields()
-
-	// Prepare empty struct to populate
-	info := Info{}
-
-	// Decode location instance --> Alternative: "err := json.NewDecoder(r.Body).Decode(&location)"
-	err := decoder.Decode(&info)
-	if err != nil {
-		// Note: more often than not is this error due to client-side input, rather than server-side issues
-		http.Error(w, "Error during decoding: "+err.Error(), http.StatusBadRequest)
+	if len(isoCode) != 2 {
+		log.Printf("Iso code is invalid: %v", isoCode)
+		http.Error(w, "Iso code is invalid", http.StatusBadRequest)
 		return
 	}
 
-	// Validation of input (Golang does not do that itself :()
-
-	// TODO: Write convenience function for validation
-
-	if info.Name == "" {
-		http.Error(w, "Invalid input: Field 'Name' is empty.", http.StatusBadRequest)
-		return
-	}
-
-	if info.Continent == "" {
-		http.Error(w, "Invalid input: Field 'Continent' not found.", http.StatusBadRequest)
-		return
-	}
-
-	// Field country is not required, hence no check
-
-	if info.Population == "" {
-		http.Error(w, "Invalid input: Field 'Population' not found.", http.StatusBadRequest)
-		return
-	}
-
-	if info.Languages == "" {
-		http.Error(w, "Invalid input: Field 'Languages' not found.", http.StatusBadRequest)
-		return
-	}
-
-	// Flat printing
-	fmt.Println("Received following request:")
-	fmt.Println(info)
-
-	// Pretty printing
-	output, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		http.Error(w, "Error during pretty printing", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("Pretty printing:")
-	fmt.Println(string(output))
-
-	// TODO: Handle content (e.g., writing to DB, process, etc.)
-
-	// Return status code (good practice)
-	http.Error(w, "OK", http.StatusOK)
-}
-
-/*
-Dedicated handler for GET requests
-*/
-func handleGetRequest(w http.ResponseWriter, r *http.Request) {
-
-	// Create instance of content (could be read from DB, file, etc.)
-	info := Info{
-		Name:       "Norway",
-		Continent:  "Europe",
-		Population: "5367580",
-		Languages:  "Norwegian",
-		Bordering:  "Sweden, Finland, Russia",
-		Flag:       "https://upload.wikimedia.org/wikipedia/commons/d/d9/Flag_of_Norway.svg",
-		Capital:    "Oslo",
-		Cities:     "Bergen, Trondheim, Stavanger",
-	}
-
-	// Write content type header (best practice)
-	w.Header().Add("content-type", "application/json")
-
-	// Instantiate encoder
-	encoder := json.NewEncoder(w)
-
-	// Encode specific content --> Alternative: "err := json.NewEncoder(w).Encode(location)"
-	err := encoder.Encode(info)
-	if err != nil {
-		http.Error(w, "Error during encoding: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	restURL := RestCountriesAPI + "alpha/" + isoCode
 
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
 
+	restCountriesRequest, err := http.NewRequest(http.MethodGet, restURL, nil)
+	if err != nil {
+		log.Printf("Error creating request: %v", err)
+		http.Error(w, RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	restCountriesRequest.Header.Add("Content-Type", "application/json")
+
+	restResponse, err := client.Do(restCountriesRequest)
+	if err != nil {
+		log.Printf("Error executing request: %v", err)
+		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	decoder := json.NewDecoder(restResponse.Body)
+
+	var countryInfo []RestCountriesResponse
+
+	if decodeErr := decoder.Decode(&countryInfo); decodeErr != nil {
+		log.Printf("Error decoding response: %v", decodeErr)
+		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	if invalidRESTRequest(countryInfo[0]) {
+		log.Printf("Invalid values in restCountriesData")
+		http.Error(w, GENERIC_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	countryPayload := map[string]string{
+		"country": countryInfo[0].Name.CountryName,
+	}
+
+	countriesNowBody, err := json.Marshal(countryPayload)
+	if err != nil {
+		log.Printf("Error marshalling request: %v", err)
+		http.Error(w, RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	countriesNowRequest, err := http.NewRequest(http.MethodPost, CountriesNowAPI, bytes.NewBuffer(countriesNowBody))
+	if err != nil {
+		log.Printf("Error creating request: %v", err)
+		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	countriesNowRequest.Header.Add("Content-Type", "application/json")
+
+	countriesNowResponse, err := client.Do(countriesNowRequest)
+	if err != nil {
+		log.Printf("Error executing request: %v", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	decoder = json.NewDecoder(countriesNowResponse.Body)
+
+	var countriesNowData Cities
+	if decodeErr := decoder.Decode(&countriesNowData); decodeErr != nil {
+		log.Printf("Error during decoding of countriesNowData json body: %v", decodeErr.Error())
+		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+	// Sort and limit cities
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			log.Printf("Invalid limit parameter: %v", err)
+			http.Error(w, INTEGER_FAULT, http.StatusBadRequest)
+			return
+		}
+
+		if limit > len(countriesNowData.Cities) { // Prevent slicing beyond bounds
+			limit = len(countriesNowData.Cities)
+		}
+
+		sort.Strings(countriesNowData.Cities)
+		countriesNowData.Cities = countriesNowData.Cities[:limit]
+	}
+
+	// Prepare response
+	infoResponse := InfoResponse{
+		Name:       countryInfo[0].Name,
+		Continents: countryInfo[0].Continents,
+		Population: countryInfo[0].Population,
+		Languages:  countryInfo[0].Languages,
+		Bordering:  countryInfo[0].Bordering,
+		Flag:       countryInfo[0].Flag.Png,
+		Capital:    countryInfo[0].Capital[0],
+		Cities:     cities.Cities,
+	}
+
+	w.Header().Add("Content-Type", JsonHeader)
+
+	encoder := json.NewEncoder(w)
+	if encodeErr := encoder.Encode(infoResponse); encodeErr != nil {
+		log.Printf("Error encoding response: %v", encodeErr)
+		http.Error(w, ENCODE_SERVER_ERROR, http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func invalidRESTRequest(data RestCountriesResponse) bool {
+	return data.Name.CountryName == "" ||
+		data.Flag.Png == "" ||
+		data.Population <= 0 ||
+		data.Capital[0] == "" ||
+		len(data.Languages) == 0 ||
+		len(data.Continents) == 0
 }

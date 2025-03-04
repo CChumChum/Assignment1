@@ -17,7 +17,7 @@ type RestCountriesResponse struct {
 	Continents []string          `json:"continents"`
 	Population int               `json:"population"`
 	Languages  map[string]string `json:"languages"`
-	Borders    []string          `json:"borders"`
+	Bordering  []string          `json:"borders"`
 	Capital    []string          `json:"capital"`
 	Flag       CountryFlag       `json:"flags"`
 }
