@@ -27,7 +27,7 @@ type InfoResponse struct {
 	Continents []string          `json:"continents"`
 	Population int               `json:"population"`
 	Languages  map[string]string `json:"languages"`
-	Bordering  []string          `json:"bordering,omitempty"`
+	Bordering  []string          `json:"bordering"`
 	Flag       string            `json:"flag"`
 	Capital    string            `json:"capital"`
 	Cities     []string          `json:"cities"`
