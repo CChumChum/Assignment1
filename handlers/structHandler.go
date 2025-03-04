@@ -23,7 +23,7 @@ type RestCountriesResponse struct {
 }
 
 type InfoResponse struct {
-	Name       CountryName       `json:"name"`
+	Name       string            `json:"name"`
 	Continents []string          `json:"continents"`
 	Population int               `json:"population"`
 	Languages  map[string]string `json:"languages"`

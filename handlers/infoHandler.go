@@ -7,16 +7,16 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 func InfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
-	case http.MethodPost:
+	case http.MethodGet:
 		handleGetInfoRequest(w, r)
 	default:
-		http.Error(w, "REST Method '"+r.Method+"' not supported. Currently only '"+http.MethodGet+
-			"' and '"+http.MethodPost+"' are supported.", http.StatusNotImplemented)
+		http.Error(w, "REST Method '"+r.Method+"' not supported. Currently only '"+http.MethodGet+"' is supported.", http.StatusNotImplemented)
 		return
 	}
 
@@ -24,16 +24,17 @@ func InfoHandler(w http.ResponseWriter, r *http.Request) {
 
 func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 
-	isoCode := r.URL.Query().Get("two_letter_country_code")
-
-	if len(isoCode) != 2 {
-		log.Printf("Iso code is invalid: %v", isoCode)
-		http.Error(w, "Iso code is invalid", http.StatusBadRequest)
+	// Extract country code from URL path
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 || len(parts[2]) != 2 {
+		log.Printf("Invalid or missing country code in URL: %v", parts)
+		http.Error(w, "Invalid or missing country code in URL", http.StatusBadRequest)
 		return
 	}
+	isoCode := strings.ToUpper(parts[2]) // Convert to uppercase for consistency
 
+	// Fetch general country info
 	restURL := RestCountriesAPI + "alpha/" + isoCode
-
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
 
@@ -54,7 +55,6 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	decoder := json.NewDecoder(restResponse.Body)
-
 	var countryInfo []RestCountriesResponse
 
 	if decodeErr := decoder.Decode(&countryInfo); decodeErr != nil {
@@ -69,10 +69,8 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	countryPayload := map[string]string{
-		"country": countryInfo[0].Name.CountryName,
-	}
-
+	// Fetch cities
+	countryPayload := map[string]string{"country": countryInfo[0].Name.CountryName}
 	countriesNowBody, err := json.Marshal(countryPayload)
 	if err != nil {
 		log.Printf("Error marshalling request: %v", err)
@@ -97,15 +95,17 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	decoder = json.NewDecoder(countriesNowResponse.Body)
-
 	var countriesNowData Cities
 	if decodeErr := decoder.Decode(&countriesNowData); decodeErr != nil {
-		log.Printf("Error during decoding of countriesNowData json body: %v", decodeErr.Error())
+		log.Printf("Error decoding cities JSON: %v", decodeErr.Error())
 		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
-	// Sort and limit cities
+	// Sort cities alphabetically before applying the limit
+	sort.Strings(countriesNowData.Cities)
+
+	// Apply limit if provided
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
 		if err != nil {
@@ -117,34 +117,31 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		if limit > len(countriesNowData.Cities) { // Prevent slicing beyond bounds
 			limit = len(countriesNowData.Cities)
 		}
-
-		sort.Strings(countriesNowData.Cities)
 		countriesNowData.Cities = countriesNowData.Cities[:limit]
 	}
 
 	// Prepare response
 	infoResponse := InfoResponse{
-		Name:       countryInfo[0].Name,
+		Name:       countryInfo[0].Name.CountryName,
 		Continents: countryInfo[0].Continents,
 		Population: countryInfo[0].Population,
 		Languages:  countryInfo[0].Languages,
 		Bordering:  countryInfo[0].Bordering,
 		Flag:       countryInfo[0].Flag.Png,
 		Capital:    countryInfo[0].Capital[0],
-		Cities:     cities.Cities,
+		Cities:     countriesNowData.Cities,
 	}
 
+	// Send response
 	w.Header().Add("Content-Type", JsonHeader)
-
 	encoder := json.NewEncoder(w)
 	if encodeErr := encoder.Encode(infoResponse); encodeErr != nil {
 		log.Printf("Error encoding response: %v", encodeErr)
 		http.Error(w, ENCODE_SERVER_ERROR, http.StatusInternalServerError)
-		return
 	}
-
 }
 
+// Function to validate REST response
 func invalidRESTRequest(data RestCountriesResponse) bool {
 	return data.Name.CountryName == "" ||
 		data.Flag.Png == "" ||
