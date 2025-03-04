@@ -2,9 +2,9 @@ package handlers
 
 const EMPTY_PATH = "/"
 const DEFAULT_PATH = "/countryinfo/v1/"
-const INFO_PATH = "/countryinfo/v1/info"
-const POPULATION_PATH = "/countryinfo/v1/population"
-const STATUS_PATH = "/countryinfo/v1/status"
+const INFO_PATH = DEFAULT_PATH + "info/"
+const POPULATION_PATH = DEFAULT_PATH + "population/"
+const STATUS_PATH = DEFAULT_PATH + "status/"
 
 const CountriesNowAPI = "http://129.241.150.113:3500/api/v0.1/"
 const RestCountriesAPI = "http://129.241.150.113:8080/v3.1/"

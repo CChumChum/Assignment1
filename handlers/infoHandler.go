@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 func InfoHandler(w http.ResponseWriter, r *http.Request) {
-
 	switch r.Method {
 	case http.MethodGet:
 		handleGetInfoRequest(w, r)
@@ -19,24 +19,34 @@ func InfoHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "REST Method '"+r.Method+"' not supported. Currently only '"+http.MethodGet+"' is supported.", http.StatusNotImplemented)
 		return
 	}
-
 }
 
 func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
-
 	// Extract country code from URL path
 	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 3 || len(parts[2]) != 2 {
+	if len(parts) < 5 || len(parts[4]) != 2 {
 		log.Printf("Invalid or missing country code in URL: %v", parts)
 		http.Error(w, "Invalid or missing country code in URL", http.StatusBadRequest)
 		return
 	}
-	isoCode := strings.ToUpper(parts[2]) // Convert to uppercase for consistency
+
+	isoCode := strings.ToUpper(parts[4]) // Convert to uppercase for consistency
+
+	// Validate the ISO code (ensure it's 2 uppercase letters)
+	if !isValidIsoCode(isoCode) {
+		log.Printf("Invalid ISO code: %s", isoCode)
+		http.Error(w, "Invalid ISO code. Please provide a valid 2-letter ISO code.", http.StatusBadRequest)
+		return
+	}
+
+	// Log the ISO code for debugging
+	log.Printf("ISO Code: %s is valid", isoCode)
 
 	// Fetch general country info
-	restURL := RestCountriesAPI + "alpha/" + isoCode
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
+
+	restURL := RestCountriesAPI + "alpha/" + isoCode
 
 	restCountriesRequest, err := http.NewRequest(http.MethodGet, restURL, nil)
 	if err != nil {
@@ -53,24 +63,54 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
+	defer restResponse.Body.Close()
+
+	// Log status code
+	log.Printf("RestCountries API response status: %s", restResponse.Status)
+
+	// Check if the status code is 200 (OK), indicating the country exists
+	if restResponse.StatusCode != http.StatusOK {
+		log.Printf("Country with ISO code %s not found, received status %s", isoCode, restResponse.Status)
+		http.Error(w, "Country not found for the provided ISO code.", http.StatusNotFound)
+		return
+	}
+
+	var countries []RestCountriesResponse // Expect an array
 
 	decoder := json.NewDecoder(restResponse.Body)
-	var countryInfo []RestCountriesResponse
-
-	if decodeErr := decoder.Decode(&countryInfo); decodeErr != nil {
+	if decodeErr := decoder.Decode(&countries); decodeErr != nil {
 		log.Printf("Error decoding response: %v", decodeErr)
 		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
-	if invalidRESTRequest(countryInfo[0]) {
+	// Ensure we got at least one country in the response
+	if len(countries) == 0 {
+		log.Printf("Empty response from API")
+		http.Error(w, "Country not found", http.StatusNotFound)
+		return
+	}
+
+	// Convert array to a single object
+	countryInfo := countries[0]
+
+	// Log the data to see what's being returned
+	log.Printf("Country Name: %s", countryInfo.Name.CountryName)
+	log.Printf("Flag: %s", countryInfo.Flag.Png)
+	log.Printf("Population: %d", countryInfo.Population)
+	log.Printf("Capital: %v", countryInfo.Capital)
+	log.Printf("Languages: %v", countryInfo.Languages)
+	log.Printf("Continents: %v", countryInfo.Continents)
+
+	// Validate the data
+	if invalidRESTRequest(countryInfo) {
 		log.Printf("Invalid values in restCountriesData")
 		http.Error(w, GENERIC_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
 	// Fetch cities
-	countryPayload := map[string]string{"country": countryInfo[0].Name.CountryName}
+	countryPayload := map[string]string{"country": countryInfo.Name.CountryName}
 	countriesNowBody, err := json.Marshal(countryPayload)
 	if err != nil {
 		log.Printf("Error marshalling request: %v", err)
@@ -93,6 +133,10 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
+	defer countriesNowResponse.Body.Close()
+
+	// Log status code
+	log.Printf("CountriesNow API response status: %s", countriesNowResponse.Status)
 
 	decoder = json.NewDecoder(countriesNowResponse.Body)
 	var countriesNowData Cities
@@ -122,13 +166,13 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare response
 	infoResponse := InfoResponse{
-		Name:       countryInfo[0].Name.CountryName,
-		Continents: countryInfo[0].Continents,
-		Population: countryInfo[0].Population,
-		Languages:  countryInfo[0].Languages,
-		Bordering:  countryInfo[0].Bordering,
-		Flag:       countryInfo[0].Flag.Png,
-		Capital:    countryInfo[0].Capital[0],
+		Name:       countryInfo.Name.CountryName,
+		Continents: countryInfo.Continents,
+		Population: countryInfo.Population,
+		Languages:  countryInfo.Languages,
+		Bordering:  countryInfo.Bordering,
+		Flag:       countryInfo.Flag.Png,
+		Capital:    countryInfo.Capital[0],
 		Cities:     countriesNowData.Cities,
 	}
 
@@ -139,6 +183,19 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding response: %v", encodeErr)
 		http.Error(w, ENCODE_SERVER_ERROR, http.StatusInternalServerError)
 	}
+}
+
+// Function to validate the ISO code (2 uppercase letters)
+func isValidIsoCode(isoCode string) bool {
+	if len(isoCode) != 2 {
+		return false
+	}
+	for _, char := range isoCode {
+		if !unicode.IsUpper(char) {
+			return false
+		}
+	}
+	return true
 }
 
 // Function to validate REST response

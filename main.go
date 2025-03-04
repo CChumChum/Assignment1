@@ -22,8 +22,9 @@ func main() {
 	router := http.NewServeMux()
 
 	// Assign path for diagnostics handlers with different patterns
-	http.HandleFunc(handlers.EMPTY_PATH, handlers.EmptyHandler)
-	router.HandleFunc(handlers.DEFAULT_PATH, handlers.InfoHandler)
+	router.HandleFunc(handlers.DEFAULT_PATH, handlers.EmptyHandler)
+	router.HandleFunc(handlers.INFO_PATH, handlers.InfoHandler)
+	router.HandleFunc(handlers.POPULATION_PATH, handlers.PopulationHandler)
 
 	// Start HTTP server
 	log.Println("Starting server on port " + port + " ...")
