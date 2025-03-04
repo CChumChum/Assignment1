@@ -12,7 +12,7 @@ type Cities struct {
 	Cities []string `json:"data"`
 }
 
-type RestCountries struct {
+type RestCountriesResponse struct {
 	Name       CountryName       `json:"name"`
 	Continents []string          `json:"continents"`
 	Population int               `json:"population"`
