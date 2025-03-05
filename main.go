@@ -21,10 +21,14 @@ func main() {
 	// Instantiate the router
 	router := http.NewServeMux()
 
+	// Instantiate the status Service
+	statusService := &handlers.StatusService{}
+
 	// Assign path for diagnostics handlers with different patterns
 	router.HandleFunc(handlers.DEFAULT_PATH, handlers.EmptyHandler)
 	router.HandleFunc(handlers.INFO_PATH, handlers.InfoHandler)
 	router.HandleFunc(handlers.POPULATION_PATH, handlers.PopulationHandler)
+	router.HandleFunc(handlers.STATUS_PATH, statusService.StatusHandler)
 
 	// Start HTTP server
 	log.Println("Starting server on port " + port + " ...")
