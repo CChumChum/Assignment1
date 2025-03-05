@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"prog2005_assignment1/constants"
 )
 
 func EmptyHandler(w http.ResponseWriter, r *http.Request) {
@@ -12,8 +13,8 @@ func EmptyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Offer information for redirection to paths
 	output := "This service does not provide any functionality on root path level. Please use paths <a href=\"" +
-		INFO_PATH + "\">" + INFO_PATH + "</a> or <a href=\"" +
-		POPULATION_PATH + "\">" + POPULATION_PATH + "</a>" //+
+		constants.INFO_PATH + "\">" + constants.INFO_PATH + "</a> or <a href=\"" +
+		constants.POPULATION_PATH + "\">" + constants.POPULATION_PATH + "</a>" //+
 	//STATUS_PATH + "\">" + STATUS_PATH + "</a>."
 
 	// Write output to client

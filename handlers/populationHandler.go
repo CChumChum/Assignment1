@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"prog2005_assignment1/constants"
+	"prog2005_assignment1/structs"
 	"strconv"
 	"strings"
 )
@@ -67,7 +69,7 @@ func handleGetPopulationRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch population data from external API
-	populationURL := CountriesNowAPI + "countries/population"
+	populationURL := constants.CountriesNowAPI + "countries/population"
 	requestBody, _ := json.Marshal(map[string]interface{}{"country": countryName})
 
 	req, err := http.NewRequest("POST", populationURL, strings.NewReader(string(requestBody)))
@@ -95,7 +97,7 @@ func handleGetPopulationRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode the population data response
-	var populationData GetPopulationData
+	var populationData structs.GetPopulationData
 	if err := json.NewDecoder(resp.Body).Decode(&populationData); err != nil {
 		log.Printf("Error decoding response: %v", err)
 		http.Error(w, "Error decoding population data", http.StatusInternalServerError)
@@ -128,13 +130,13 @@ func handleGetPopulationRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare the response data
-	response := PopulationInfoResponse{
+	response := structs.PopulationInfoResponse{
 		Mean:   mean,
 		Values: filteredValues,
 	}
 
 	// Set the response headers and send the data
-	w.Header().Add("Content-Type", JsonHeader)
+	w.Header().Add("Content-Type", constants.JsonHeader)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Error encoding response: %v", err)
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
@@ -142,7 +144,7 @@ func handleGetPopulationRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func fetchCountryName(isoCode string) (string, error) {
-	restCountriesURL := RestCountriesAPI + "alpha/" + isoCode
+	restCountriesURL := constants.RestCountriesAPI + "alpha/" + isoCode
 
 	resp, err := http.Get(restCountriesURL)
 	if err != nil {

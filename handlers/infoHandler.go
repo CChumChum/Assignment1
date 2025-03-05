@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"prog2005_assignment1/constants"
+	"prog2005_assignment1/structs"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,12 +48,12 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 	defer client.CloseIdleConnections()
 
-	restURL := RestCountriesAPI + "alpha/" + isoCode
+	restURL := constants.RestCountriesAPI + "alpha/" + isoCode
 
 	restCountriesRequest, err := http.NewRequest(http.MethodGet, restURL, nil)
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
-		http.Error(w, RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
@@ -60,7 +62,7 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	restResponse, err := client.Do(restCountriesRequest)
 	if err != nil {
 		log.Printf("Error executing request: %v", err)
-		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 	defer restResponse.Body.Close()
@@ -75,12 +77,12 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var countries []RestCountriesResponse // Expect an array
+	var countries []structs.RestCountriesResponse // Expect an array
 
 	decoder := json.NewDecoder(restResponse.Body)
 	if decodeErr := decoder.Decode(&countries); decodeErr != nil {
 		log.Printf("Error decoding response: %v", decodeErr)
-		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
@@ -105,7 +107,7 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	// Validate the data
 	if invalidRESTRequest(countryInfo) {
 		log.Printf("Invalid values in restCountriesData")
-		http.Error(w, GENERIC_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.GENERIC_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
@@ -114,14 +116,14 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	countriesNowBody, err := json.Marshal(countryPayload)
 	if err != nil {
 		log.Printf("Error marshalling request: %v", err)
-		http.Error(w, RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.RESPONSE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
-	countriesNowRequest, err := http.NewRequest(http.MethodPost, CountriesNowAPI, bytes.NewBuffer(countriesNowBody))
+	countriesNowRequest, err := http.NewRequest(http.MethodPost, constants.CountriesNowAPI, bytes.NewBuffer(countriesNowBody))
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
-		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
@@ -139,10 +141,10 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CountriesNow API response status: %s", countriesNowResponse.Status)
 
 	decoder = json.NewDecoder(countriesNowResponse.Body)
-	var countriesNowData Cities
+	var countriesNowData structs.Cities
 	if decodeErr := decoder.Decode(&countriesNowData); decodeErr != nil {
 		log.Printf("Error decoding cities JSON: %v", decodeErr.Error())
-		http.Error(w, DECODE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.DECODE_SERVER_ERROR, http.StatusInternalServerError)
 		return
 	}
 
@@ -154,7 +156,7 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		limit, err := strconv.Atoi(limitStr)
 		if err != nil {
 			log.Printf("Invalid limit parameter: %v", err)
-			http.Error(w, INTEGER_FAULT, http.StatusBadRequest)
+			http.Error(w, constants.INTEGER_FAULT, http.StatusBadRequest)
 			return
 		}
 
@@ -165,7 +167,7 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare response
-	infoResponse := InfoResponse{
+	infoResponse := structs.InfoResponse{
 		Name:       countryInfo.Name.CountryName,
 		Continents: countryInfo.Continents,
 		Population: countryInfo.Population,
@@ -177,11 +179,11 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send response
-	w.Header().Add("Content-Type", JsonHeader)
+	w.Header().Add("Content-Type", constants.JsonHeader)
 	encoder := json.NewEncoder(w)
 	if encodeErr := encoder.Encode(infoResponse); encodeErr != nil {
 		log.Printf("Error encoding response: %v", encodeErr)
-		http.Error(w, ENCODE_SERVER_ERROR, http.StatusInternalServerError)
+		http.Error(w, constants.ENCODE_SERVER_ERROR, http.StatusInternalServerError)
 	}
 }
 
@@ -199,7 +201,7 @@ func isValidIsoCode(isoCode string) bool {
 }
 
 // Function to validate REST response
-func invalidRESTRequest(data RestCountriesResponse) bool {
+func invalidRESTRequest(data structs.RestCountriesResponse) bool {
 	return data.Name.CountryName == "" ||
 		data.Flag.Png == "" ||
 		data.Population <= 0 ||

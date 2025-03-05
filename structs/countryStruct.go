@@ -1,4 +1,4 @@
-package handlers
+package structs
 
 type CountryName struct {
 	CountryName string `json:"common"`
@@ -31,24 +31,4 @@ type InfoResponse struct {
 	Flag       string            `json:"flag"`
 	Capital    string            `json:"capital"`
 	Cities     []string          `json:"cities"`
-}
-
-type PopulationData struct {
-	PopulationInfo []map[string]int `json:"populationCounts"`
-}
-
-type GetPopulationData struct {
-	Data PopulationData `json:"data"`
-}
-
-type PopulationInfoResponse struct {
-	Mean   int              `json:"mean"`
-	Values []map[string]int `json:"values"`
-}
-
-type StatusResponse struct {
-	CountriesNowApi  int    `json:"countriesNowApi"`
-	RestCountriesApi int    `json:"restCountriesApi"`
-	Version          string `json:"version"`
-	Uptime           string `json:"uptime"`
 }

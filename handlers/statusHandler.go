@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"prog2005_assignment1/constants"
+	"prog2005_assignment1/structs"
 	"strconv"
 	"time"
 )
@@ -15,10 +17,10 @@ type StatusService struct{}
 func (s *StatusService) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("StatusHandler invoked") // Debugging log
 
-	statusResponse := StatusResponse{
-		CountriesNowApi:  s.checkAPIStatus(CountriesNowAPI + "countries/"),
-		RestCountriesApi: s.checkAPIStatus(RestCountriesAPI + "all"),
-		Version:          VERSION,
+	statusResponse := structs.StatusResponse{
+		CountriesNowApi:  s.checkAPIStatus(constants.CountriesNowAPI + "countries/"),
+		RestCountriesApi: s.checkAPIStatus(constants.RestCountriesAPI + "all"),
+		Version:          constants.VERSION,
 		Uptime:           strconv.FormatFloat(time.Since(startTime).Seconds(), 'f', 2, 64) + "s",
 	}
 

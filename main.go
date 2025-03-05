@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"prog2005_assignment1/constants"
 	"prog2005_assignment1/handlers"
 )
 
@@ -25,10 +26,10 @@ func main() {
 	statusService := &handlers.StatusService{}
 
 	// Assign path for diagnostics handlers with different patterns
-	router.HandleFunc(handlers.DEFAULT_PATH, handlers.EmptyHandler)
-	router.HandleFunc(handlers.INFO_PATH, handlers.InfoHandler)
-	router.HandleFunc(handlers.POPULATION_PATH, handlers.PopulationHandler)
-	router.HandleFunc(handlers.STATUS_PATH, statusService.StatusHandler)
+	router.HandleFunc(constants.DEFAULT_PATH, handlers.EmptyHandler)
+	router.HandleFunc(constants.INFO_PATH, handlers.InfoHandler)
+	router.HandleFunc(constants.POPULATION_PATH, handlers.PopulationHandler)
+	router.HandleFunc(constants.STATUS_PATH, statusService.StatusHandler)
 
 	// Start HTTP server
 	log.Println("Starting server on port " + port + " ...")
