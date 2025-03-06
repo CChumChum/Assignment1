@@ -120,7 +120,7 @@ func handleGetInfoRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	countriesNowRequest, err := http.NewRequest(http.MethodPost, constants.CountriesNowAPI, bytes.NewBuffer(countriesNowBody))
+	countriesNowRequest, err := http.NewRequest(http.MethodPost, constants.CountriesNowAPI+"countries/cities", bytes.NewBuffer(countriesNowBody))
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
 		http.Error(w, constants.DECODE_SERVER_ERROR, http.StatusInternalServerError)
